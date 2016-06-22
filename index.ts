@@ -1,18 +1,22 @@
-import { ul, li, makeDOMDriver, DOMSource, VNode } from '@cycle/dom'
-import { makeHTTPDriver, HTTPSource } from '@cycle/http'
-import { Observable } from 'rxjs'
-import { run } from '@cycle/rxjs-run'
+import xs, { Stream } from 'xstream'
+import { DOMSource } from '@cycle/dom/xstream-typings'
+import flattenConcurrently from 'xstream/extra/flattenConcurrently'
+import { HTTPSource } from '@cycle/http/xstream-typings'
+import { run } from '@cycle/xstream-run'
+
+import { ul, li, makeDOMDriver, VNode } from '@cycle/dom'
+import { makeHTTPDriver, RequestOptions } from '@cycle/http'
 
 interface User {
-  name: String,
-  homeworld: String
+  name: string,
+  homeworld: string
 }
 interface Planet {
-  name: String,
-  url: String
+  name: string,
+  url: string
 }
 interface UsersResBody {
-  results: Array<User>
+  results: User[]
 }
 interface Response<T> {
   body: T
@@ -26,34 +30,38 @@ interface Sources {
   HTTP: HTTPSource 
 }
 interface Sinks {
-  DOM: Observable<VNode>,
-  HTTP: Observable<any>
+  [name: string]: Stream<any>
+  // DOM: Stream<VNode>,
+  // HTTP: Stream<RequestOptions>
 }
 interface Drivers {
   [name: string]: Function
 }
+interface Intent {
+  [name: string]: Stream<any>
+}
 
-function intent(HTTPSource: HTTPSource) {
-  const url = 'http://swapi.co/api/people/'
+function intent(HTTPSource: HTTPSource): Intent {
+  const url: string = 'http://swapi.co/api/people/'
 
-  const usersReq$ = Observable.of({ url, category: 'users' })
+  const usersReq$: Stream<RequestOptions> = xs.of({ url, category: 'users' })
 
-  const users$ = HTTPSource
+  const users$: Stream<User[]> = HTTPSource
     .select('users')
-    .switch()
+    .flatten()
     .map((res: Response<UsersResBody>) => res.body.results)
 
-  const homeworldsReq$ = users$.flatMap((users: Array<User> ) => {
-    return users.map((user: User ) => {
-      return { url: user.homeworld, category: 'homeworld' } 
-    })
-  })
+  const homeworldsReq$: Stream<RequestOptions> = users$.map((users: User[]): Stream<RequestOptions> => {
+    return xs.fromArray(users.map((user: User): RequestOptions => {
+      return { url: user.homeworld, category: 'homeworld' }
+    }))
+  }).flatten()
 
   const homeworlds$ = HTTPSource
     .select('homeworld')
-    .mergeAll()
-    .map((res: Response<Planet> ) => res.body)
-    .scan((acc: Array<Planet>, homeworld: Planet) => {
+    .compose(flattenConcurrently)
+    .map((res: Response<Planet>) => res.body)
+    .fold((acc: Planet[], homeworld: Planet) => {
       acc = acc.concat(homeworld)
       return acc
     }, [])
@@ -61,20 +69,18 @@ function intent(HTTPSource: HTTPSource) {
   return { users$, homeworlds$, usersReq$, homeworldsReq$ }
 }
 
-function model(users$: Observable<Array<User>>, homeworlds$: Observable<Array<Planet>>) {
-  return Observable.combineLatest(
-    users$,
-    homeworlds$,
-    (users, homeworlds) => {
+function model(users$: Stream<User[]>, homeworlds$: Stream<Planet[]>): Stream<ViewState[]> {
+  return xs.combine(users$, homeworlds$)
+    .last() 
+    .map(([users, homeworlds]) => {
       return users.map(user => {
         const homeworld = homeworlds.filter(hw => hw.url === user.homeworld)[0]
         return { user, homeworld }
       })
-    }
-  )
+    })
 }
 
-function view(state$: Observable<Array<ViewState>>) {
+function view(state$: Stream<ViewState[]>): Stream<VNode> {
   return state$.map(state =>
     ul(
       state.map((model: ViewState) =>
@@ -91,7 +97,11 @@ function main(sources: Sources): Sinks {
 
   return {
     DOM: vtree$,
-    HTTP: Observable.merge(usersReq$, homeworldsReq$)
+    // HTTP: xs.combine(usersReq$, homeworldsReq$).flatten()
+    // HTTP: xs.combine(usersReq$, homeworldsReq$)
+    // HTTP: xs.merge<Stream<RequestOptions>, Stream<RequestOptions>>(usersReq$, homeworldsReq$)
+    // HTTP: xs.merge<RequestOptions | RequestOptions[]>(usersReq$, homeworldsReq$)
+    HTTP: xs.merge<RequestOptions>(usersReq$, homeworldsReq$.flatten())
   }
 }
 
