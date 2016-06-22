@@ -1,11 +1,10 @@
-import xs, { Stream } from 'xstream'
 import { DOMSource } from '@cycle/dom/xstream-typings'
 import flattenConcurrently from 'xstream/extra/flattenConcurrently'
 import { HTTPSource } from '@cycle/http/xstream-typings'
-import { run } from '@cycle/xstream-run'
-
-import { ul, li, makeDOMDriver, VNode } from '@cycle/dom'
+import { makeDOMDriver, ul, li, VNode } from '@cycle/dom'
 import { makeHTTPDriver, RequestOptions } from '@cycle/http'
+import { run } from '@cycle/xstream-run'
+import xs, { Stream } from 'xstream'
 
 interface User {
   name: string,
@@ -30,9 +29,8 @@ interface Sources {
   HTTP: HTTPSource 
 }
 interface Sinks {
-  [name: string]: Stream<any>
-  // DOM: Stream<VNode>,
-  // HTTP: Stream<RequestOptions>
+  DOM: Stream<VNode>,
+  HTTP: Stream<RequestOptions>
 }
 interface Drivers {
   [name: string]: Function
@@ -42,7 +40,7 @@ interface Intent {
 }
 
 function intent(HTTPSource: HTTPSource): Intent {
-  const url: string = 'http://swapi.co/api/people/'
+  const url = 'http://swapi.co/api/people/'
 
   const usersReq$: Stream<RequestOptions> = xs.of({ url, category: 'users' })
 
@@ -102,7 +100,7 @@ function main(sources: Sources): Sinks {
 
 const drivers: Drivers = {
   DOM: makeDOMDriver('#app'),
-  HTTP: makeHTTPDriver() // { eager: true }
+  HTTP: makeHTTPDriver()
 }
 
 run(main, drivers)
