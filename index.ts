@@ -71,7 +71,6 @@ function intent(HTTPSource: HTTPSource): Intent {
 
 function model(users$: Stream<User[]>, homeworlds$: Stream<Planet[]>): Stream<ViewState[]> {
   return xs.combine(users$, homeworlds$)
-    .last() 
     .map(([users, homeworlds]) => {
       return users.map(user => {
         const homeworld = homeworlds.filter(hw => hw.url === user.homeworld)[0]
