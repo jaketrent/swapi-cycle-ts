@@ -10,6 +10,7 @@
     "@cycle/dom": "^10.0.0-rc34",
     "@cycle/http": "^9.0.0-rc10",
     "@cycle/isolate": "^1.3.2",
+    "@cycle/rxjs-run": "^3.0.2",
     "@cycle/xstream-run": "^3.0.3",
     "babel": "^6.5.2",
     "babel-loader": "^6.2.4",

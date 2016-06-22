@@ -1,9 +1,7 @@
-import { ul, li, makeDOMDriver } from '@cycle/dom'
-import { DOMSource } from '@cycle/dom/xstream-typings'
-// import { HTTPSource } from '@cycle/http/xstream-typings'
-import { makeHTTPDriver } from '@cycle/http'
-import { Observable } from 'rx'
-import { run } from '@cycle/xstream-run'
+import { ul, li, makeDOMDriver, DOMSource, VNode } from '@cycle/dom'
+import { makeHTTPDriver, HTTPSource } from '@cycle/http'
+import { Observable } from 'rxjs'
+import { run } from '@cycle/rxjs-run'
 
 interface User {
   name: String,
@@ -17,7 +15,7 @@ interface UsersResBody {
   results: Array<User>
 }
 interface Response<T> {
-  body: T 
+  body: T
 }
 interface ViewState {
   user: User,
@@ -25,28 +23,34 @@ interface ViewState {
 }
 interface Sources {
   DOM: DOMSource,
-  HTTP: Observable<any> // TODO: type something more like HTTPSource
+  HTTP: HTTPSource 
+}
+interface Sinks {
+  DOM: Observable<VNode>,
+  HTTP: Observable<any>
+}
+interface Drivers {
+  [name: string]: Function
 }
 
-// TODO: give a better observable type
-function intent(HTTPSource: Observable<any>) {
+function intent(HTTPSource: HTTPSource) {
   const url = 'http://swapi.co/api/people/'
 
-  const usersReq$ = Observable.just({ url })
+  const usersReq$ = Observable.of({ url, category: 'users' })
 
   const users$ = HTTPSource
-    .filter(res$ => res$.request.url === url)
+    .select('users')
     .switch()
     .map((res: Response<UsersResBody>) => res.body.results)
 
   const homeworldsReq$ = users$.flatMap((users: Array<User> ) => {
     return users.map((user: User ) => {
-      return { url: user.homeworld, id: 'homeworld' } 
+      return { url: user.homeworld, category: 'homeworld' } 
     })
   })
 
   const homeworlds$ = HTTPSource
-    .filter(res$ => res$.request.id === 'homeworld')
+    .select('homeworld')
     .mergeAll()
     .map((res: Response<Planet> ) => res.body)
     .scan((acc: Array<Planet>, homeworld: Planet) => {
@@ -80,7 +84,7 @@ function view(state$: Observable<Array<ViewState>>) {
   )
 }
 
-function main(sources: Sources) {
+function main(sources: Sources): Sinks {
   const { users$, homeworlds$, usersReq$, homeworldsReq$ } = intent(sources.HTTP)
   const state$ = model(users$, homeworlds$)
   const vtree$ = view(state$)
@@ -91,12 +95,10 @@ function main(sources: Sources) {
   }
 }
 
-const drivers = {
+const drivers: Drivers = {
   DOM: makeDOMDriver('#app'),
-  HTTP: makeHTTPDriver()
+  HTTP: makeHTTPDriver() // { eager: true }
 }
 
-// follow this goodness
-// https://github.com/cyclejs/examples/blob/diversity/bmi-typescript/src/BmiCalculator.ts
-// run(main, drivers)
+run(main, drivers)
 
