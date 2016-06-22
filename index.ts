@@ -97,11 +97,7 @@ function main(sources: Sources): Sinks {
 
   return {
     DOM: vtree$,
-    // HTTP: xs.combine(usersReq$, homeworldsReq$).flatten()
-    // HTTP: xs.combine(usersReq$, homeworldsReq$)
-    // HTTP: xs.merge<Stream<RequestOptions>, Stream<RequestOptions>>(usersReq$, homeworldsReq$)
-    // HTTP: xs.merge<RequestOptions | RequestOptions[]>(usersReq$, homeworldsReq$)
-    HTTP: xs.merge<RequestOptions>(usersReq$, homeworldsReq$.flatten())
+    HTTP: xs.merge<RequestOptions>(usersReq$, homeworldsReq$)
   }
 }
 
